@@ -9,7 +9,15 @@ model.float()
 model.eval()
 
 savepath = os.path.join(os.getcwd(), 'data', 'video') 
-vid = cv2.VideoCapture(0)
+
+USE_WEBCAM = False  # Set to False to use the MP4 file
+
+# Conditional video source selection
+if USE_WEBCAM:
+    vid = cv2.VideoCapture(0)  # Use webcam
+else:
+    video_path = 'red_light_running_compilation.mp4'  # Path to your MP4 file
+    vid = cv2.VideoCapture(video_path)  # Use MP4 file
 
 mot_tracker = Sort() # create instance of the SORT tracker 
 
