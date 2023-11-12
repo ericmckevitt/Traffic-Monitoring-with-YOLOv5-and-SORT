@@ -37,6 +37,9 @@ human_colour = (0, 255, 0) # Green for humans
 # Initialize a dictionary to map SORT IDs to class IDs
 sort_id_to_class_id = {}
 
+# Initialize a dictionary to store the positions of each tracked object
+tracked_positions = {}
+
 while(True):
     ret, image_show = vid.read()
     preds = model(image_show)
@@ -68,6 +71,21 @@ while(True):
     for j in range(len(track_bbs_ids)):
         coords = track_bbs_ids[j]
         x1, y1, x2, y2, obj_id = map(int, coords[:5])
+
+        # Calculate the centroid of the bounding box
+        centroid = (int((x1 + x2) / 2), int((y1 + y2) / 2))
+
+        # Update the tracked positions
+        if obj_id not in tracked_positions:
+            tracked_positions[obj_id] = [centroid]
+        else:
+            tracked_positions[obj_id].append(centroid)
+
+        # Draw the path of the tracked object
+        for k in range(1, len(tracked_positions[obj_id])):
+            if k == 1:
+                continue
+            cv2.line(image_show, tracked_positions[obj_id][k - 1], tracked_positions[obj_id][k], color, 2)
 
         # Retrieve class ID from the mapping
         cls_id = sort_id_to_class_id.get(obj_id, None)
