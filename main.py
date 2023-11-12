@@ -23,26 +23,68 @@ colours = [(255, 0, 0),   # Blue
 
 colours = colours * (100 // len(colours) + 1)
 
-while(True):
+car_colour = (255, 0, 0)   # Red for cars
+human_colour = (0, 255, 0) # Green for humans
 
+# Initialize a dictionary to map SORT IDs to class IDs
+sort_id_to_class_id = {}
+
+while(True):
     ret, image_show = vid.read()
     preds = model(image_show)
-    detections = preds.pred[0].numpy()
-    track_bbs_ids = mot_tracker.update(detections)
 
-    for j in range(len(track_bbs_ids.tolist())):
+    # Filter out detections to only include cars (class index 2) and humans (class index 0)
+    filtered_detections = []
+    for det in preds.pred[0]:
+        if int(det[-1]) in [0, 2]:  # Check class ID
+            bbox = det[:4].tolist()
+            score = det[4].item()
+            cls_id = int(det[5].item())
+            filtered_detections.append([*bbox, score, cls_id])
 
-        coords = list(track_bbs_ids)[j]
-        x1, y1, x2, y2 = int(coords[0]), int(coords[1]), int(coords[2]), int(coords[3])
-        name_idx = int(coords[4])
-        name = f"ID: {name_idx}"
-        color = colours[name_idx]
-        cv2.rectangle(image_show, (x1, y1), (x2, y2), color, 2)
-        cv2.putText(image_show, name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-        cv2.imshow('Image', image_show)
+    # Convert to numpy array for SORT
+    if filtered_detections:
+        filtered_detections_np = np.array(filtered_detections)
+        track_bbs_ids = mot_tracker.update(filtered_detections_np[:,:4]) # Only pass bbox coordinates to SORT
+        
+        # Update SORT ID to class ID mapping
+        for det, track in zip(filtered_detections, track_bbs_ids):
+            sort_id_to_class_id[int(track[4])] = det[5]
+    else:
+        track_bbs_ids = np.empty((0, 5))
 
-    if cv2.waitKey(1) & 0xFF == ord('q'): # press q to quit
+    print("Tracked objects:")
+    for track in track_bbs_ids:
+        print(track)
+
+    for j in range(len(track_bbs_ids)):
+        coords = track_bbs_ids[j]
+        x1, y1, x2, y2, obj_id = map(int, coords[:5])
+
+        # Retrieve class ID from the mapping
+        cls_id = sort_id_to_class_id.get(obj_id, None)
+        
+        # Draw bounding box and label if class ID is known
+        if cls_id is not None:
+            if cls_id == 0:  # Human
+                color = human_colour
+                label = "Human"
+            elif cls_id == 2:  # Car
+                color = car_colour
+                label = "Car"
+            else:
+                continue  # Skip if it's not a car or human
+
+            cv2.rectangle(image_show, (x1, y1), (x2, y2), color, 2)
+            cv2.putText(image_show, f"{label} ID: {obj_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
+
+    # Display the image
+    cv2.imshow('Image', image_show)
+
+    # Break the loop with 'q' key
+    if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
+# Release video capture and close all windows
 vid.release()
 cv2.destroyAllWindows()
