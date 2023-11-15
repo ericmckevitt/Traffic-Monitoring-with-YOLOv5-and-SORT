@@ -1,5 +1,6 @@
 # Traffic Monitoring with YOLOv5 and SORT
 CSCI 507: Computer Vision
+By Eric McKevitt
 
 ## Overview:
 This repository contains the implementation of a traffic monitoring system that uses YOLOv5 for object detection and SORT (Simple Online and Realtime Tracking) algorithm for object tracking. The system is designed to detect and track vehicles through video streams in both daylight and nighttime settings, providing real-time tracking information.
