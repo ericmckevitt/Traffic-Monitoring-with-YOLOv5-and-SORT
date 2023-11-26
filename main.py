@@ -11,6 +11,7 @@ model.eval()
 savepath = os.path.join(os.getcwd(), 'data', 'video') 
 
 USE_WEBCAM = False  # Set to False to use the MP4 file
+DEBUG = False  # Set to True to print debug messages
 
 # Conditional video source selection
 if USE_WEBCAM:
@@ -21,13 +22,34 @@ else:
 
 mot_tracker = Sort() # create instance of the SORT tracker 
 
+# Load the red light template
+red_light_template = cv2.imread(os.path.join('img', 'red_light2.png'), 0) 
+template_h, template_w = red_light_template.shape[:2]
+
+def detect_red_lights(frame, template):
+    # Convert the frame to grayscale
+    frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # Convert the template to grayscale only if it has more than 1 channel
+    if len(template.shape) == 3:
+        template_gray = cv2.cvtColor(template, cv2.COLOR_BGR2GRAY)
+    else:
+        template_gray = template  # Template is already in grayscale
+
+    # Perform template matching
+    result = cv2.matchTemplate(frame_gray, template_gray, cv2.TM_CCOEFF_NORMED)
+    threshold = 0.37
+    loc = np.where(result >= threshold)
+    return loc
+
+
 colours = [(255, 0, 0),   # Blue
-           (0, 255, 0),   # Green
-           (0, 0, 255),   # Red
-           (255, 255, 0), # Cyan
-           (255, 0, 255), # Magenta
-           (0, 255, 255), # Yellow
-           (255, 255, 255)] # White
+            (0, 255, 0),   # Green
+            (0, 0, 255),   # Red
+            (255, 255, 0), # Cyan
+            (255, 0, 255), # Magenta
+            (0, 255, 255), # Yellow
+            (255, 255, 255)] # White
 
 colours = colours * (100 // len(colours) + 1)
 
@@ -42,6 +64,14 @@ tracked_positions = {}
 
 while(True):
     ret, image_show = vid.read()
+
+    # Detect red lights in the current frame
+    red_light_locations = detect_red_lights(image_show, red_light_template)
+
+    # Draw rectangles around detected red lights
+    for pt in zip(*red_light_locations[::-1]):
+        cv2.rectangle(image_show, pt, (pt[0] + template_w, pt[1] + template_h), (0, 255, 255), 2)  # Yellow box
+
     preds = model(image_show)
 
     # Filter out detections to only include cars (class index 2) and humans (class index 0)
@@ -64,9 +94,10 @@ while(True):
     else:
         track_bbs_ids = np.empty((0, 5))
 
-    print("Tracked objects:")
-    for track in track_bbs_ids:
-        print(track)
+    if DEBUG: 
+        print("Tracked objects:")
+        for track in track_bbs_ids:
+            print(track)
 
     for j in range(len(track_bbs_ids)):
         coords = track_bbs_ids[j]
