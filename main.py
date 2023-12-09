@@ -17,13 +17,13 @@ DEBUG = False  # Set to True to print debug messages
 if USE_WEBCAM:
     vid = cv2.VideoCapture(0)  # Use webcam
 else:
-    video_path = 'red_light_running_compilation.mp4'  # Path to your MP4 file
+    video_path = 'videos/red_light_running_compilation.mp4'  # Path to your MP4 file
     vid = cv2.VideoCapture(video_path)  # Use MP4 file
 
 mot_tracker = Sort() # create instance of the SORT tracker 
 
 # Load the red light template
-red_light_template = cv2.imread(os.path.join('img', 'red_light2.png'), 0) 
+red_light_template = cv2.imread(os.path.join('img', 'red_light4.png'), 0) 
 template_h, template_w = red_light_template.shape[:2]
 
 def detect_red_lights(frame, template):
@@ -40,7 +40,8 @@ def detect_red_lights(frame, template):
     result = cv2.matchTemplate(frame_gray, template_gray, cv2.TM_CCOEFF_NORMED)
     threshold = 0.37
     loc = np.where(result >= threshold)
-    return loc
+    is_red_light_detected = np.any(result >= threshold)
+    return loc, is_red_light_detected
 
 
 colours = [(255, 0, 0),   # Blue
@@ -53,8 +54,7 @@ colours = [(255, 0, 0),   # Blue
 
 colours = colours * (100 // len(colours) + 1)
 
-car_colour = (255, 0, 0)   # Red for cars
-human_colour = (0, 255, 0) # Green for humans
+car_colour = (255, 0, 0)   # Blue for cars
 
 # Initialize a dictionary to map SORT IDs to class IDs
 sort_id_to_class_id = {}
@@ -62,15 +62,29 @@ sort_id_to_class_id = {}
 # Initialize a dictionary to store the positions of each tracked object
 tracked_positions = {}
 
+line_points = []
+def mouse_click(event, x, y, flags, param):
+    global line_points
+    if event == cv2.EVENT_LBUTTONDOWN:
+        if len(line_points) < 2:
+            line_points.append((x, y))
+            print("Point added:", (x, y))
+
+cv2.namedWindow('Image')
+cv2.setMouseCallback('Image', mouse_click)
+
 while(True):
     ret, image_show = vid.read()
 
     # Detect red lights in the current frame
-    red_light_locations = detect_red_lights(image_show, red_light_template)
+    red_light_locations, is_red_light_detected = detect_red_lights(image_show, red_light_template)
 
-    # Draw rectangles around detected red lights
-    for pt in zip(*red_light_locations[::-1]):
-        cv2.rectangle(image_show, pt, (pt[0] + template_w, pt[1] + template_h), (0, 255, 255), 2)  # Yellow box
+    if is_red_light_detected:
+        cv2.putText(image_show, "Red light", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        
+    # Draw the line if two points have been selected
+    if len(line_points) == 2:
+        cv2.line(image_show, line_points[0], line_points[1], (0, 255, 0), 2)  # Green line
 
     preds = model(image_show)
 
@@ -123,14 +137,11 @@ while(True):
         
         # Draw bounding box and label if class ID is known
         if cls_id is not None:
-            if cls_id == 0:  # Human
-                color = human_colour
-                label = "Human"
-            elif cls_id == 2:  # Car
+            if cls_id == 2:  # Car
                 color = car_colour
                 label = "Car"
             else:
-                continue  # Skip if it's not a car or human
+                continue  # Skip if it's not a car
 
             cv2.rectangle(image_show, (x1, y1), (x2, y2), color, 2)
             cv2.putText(image_show, f"{label} ID: {obj_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
