@@ -62,7 +62,6 @@ sort_id_to_class_id = {}
 # Initialize a dictionary to store the positions of each tracked object
 tracked_positions = {}
 
-line_points = []
 def mouse_click(event, x, y, flags, param):
     global line_points
     if event == cv2.EVENT_LBUTTONDOWN:
@@ -70,8 +69,39 @@ def mouse_click(event, x, y, flags, param):
             line_points.append((x, y))
             print("Point added:", (x, y))
 
-cv2.namedWindow('Image')
-cv2.setMouseCallback('Image', mouse_click)
+def compute_line_equation(p1, p2):
+    # Compute coefficients A, B, and C for the line equation Ax + By + C = 0
+    A = p2[1] - p1[1]
+    B = p1[0] - p2[0]
+    C = p2[0] * p1[1] - p1[0] * p2[1]
+    return A, B, C
+
+def check_side_of_line(point, line_coeff):
+    # Check which side of the line the point is on
+    # Returns positive if on one side, negative if on the other, and 0 if on the line
+    A, B, C = line_coeff
+    x, y = point
+    return A*x + B*y + C
+
+# Preliminary loop to select the line
+line_points = []
+while len(line_points) < 2:
+    ret, image_show = vid.read()
+    if not ret:
+        break
+
+    # Show the first point if it's selected
+    if len(line_points) == 1:
+        cv2.circle(image_show, line_points[0], 5, (0, 255, 0), -1)
+
+    cv2.imshow('Image', image_show)
+    cv2.setMouseCallback('Image', mouse_click)
+
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Compute the line equation now that we have both points
+line_coeff = compute_line_equation(line_points[0], line_points[1])
 
 while(True):
     ret, image_show = vid.read()
@@ -82,9 +112,9 @@ while(True):
     if is_red_light_detected:
         cv2.putText(image_show, "Red light", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
         
-    # Draw the line if two points have been selected
+    # Draw the line that car has to cross to register red light violation
     if len(line_points) == 2:
-        cv2.line(image_show, line_points[0], line_points[1], (0, 255, 0), 2)  # Green line
+        cv2.line(image_show, line_points[0], line_points[1], (0, 255, 0), 2)
 
     preds = model(image_show)
 
