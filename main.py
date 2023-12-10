@@ -62,6 +62,8 @@ sort_id_to_class_id = {}
 # Initialize a dictionary to store the positions of each tracked object
 tracked_positions = {}
 
+violations = set()  # To keep track of cars that have violated
+
 def mouse_click(event, x, y, flags, param):
     global line_points
     if event == cv2.EVENT_LBUTTONDOWN:
@@ -143,6 +145,7 @@ while(True):
         for track in track_bbs_ids:
             print(track)
 
+    # Update tracked positions and check for violations
     for j in range(len(track_bbs_ids)):
         coords = track_bbs_ids[j]
         x1, y1, x2, y2, obj_id = map(int, coords[:5])
@@ -155,6 +158,19 @@ while(True):
             tracked_positions[obj_id] = [centroid]
         else:
             tracked_positions[obj_id].append(centroid)
+            
+        # Check for violation if a red light detected and we have enough positions tracked
+        if is_red_light_detected and len(tracked_positions[obj_id]) >= 2:
+            prev_pos = tracked_positions[obj_id][-2]
+            curr_pos = tracked_positions[obj_id][-1]
+            
+            prev_side_of_line = check_side_of_line(prev_pos, line_coeff)
+            curr_side_of_line = check_side_of_line(curr_pos, line_coeff)
+            
+            # Check if crossed from bottom to top
+            if prev_side_of_line < 0 and curr_side_of_line > 0 and obj_id not in violations:
+                violations.add(obj_id)
+                print(f"Violation detected for car with ID: {obj_id}")
 
         # Draw the path of the tracked object
         for k in range(1, len(tracked_positions[obj_id])):
@@ -165,14 +181,14 @@ while(True):
         # Retrieve class ID from the mapping
         cls_id = sort_id_to_class_id.get(obj_id, None)
         
-        # Draw bounding box and label if class ID is known
-        if cls_id is not None:
-            if cls_id == 2:  # Car
-                color = car_colour
-                label = "Car"
+        # Determine the color of the bounding box
+        if cls_id == 2:  # Car
+            if obj_id in violations:
+                color = (0, 0, 255)  # Red for violation
             else:
-                continue  # Skip if it's not a car
+                color = car_colour  # Default blue color for cars
 
+            label = "Car"
             cv2.rectangle(image_show, (x1, y1), (x2, y2), color, 2)
             cv2.putText(image_show, f"{label} ID: {obj_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
 
