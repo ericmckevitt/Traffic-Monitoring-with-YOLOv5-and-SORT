@@ -172,26 +172,29 @@ while(True):
                 violations.add(obj_id)
                 print(f"Violation detected for car with ID: {obj_id}")
 
-        # Draw the path of the tracked object
-        for k in range(1, len(tracked_positions[obj_id])):
-            if k == 1:
-                continue
-            cv2.line(image_show, tracked_positions[obj_id][k - 1], tracked_positions[obj_id][k], color, 2)
-
         # Retrieve class ID from the mapping
         cls_id = sort_id_to_class_id.get(obj_id, None)
         
         # Determine the color of the bounding box
+        bbox_color = car_colour  # Default blue color for cars
         if cls_id == 2:  # Car
             if obj_id in violations:
-                color = (0, 0, 255)  # Red for violation
-            else:
-                color = car_colour  # Default blue color for cars
+                bbox_color = (0, 0, 255)  # Red for violation
 
             label = "Car"
-            cv2.rectangle(image_show, (x1, y1), (x2, y2), color, 2)
-            cv2.putText(image_show, f"{label} ID: {obj_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
+            cv2.rectangle(image_show, (x1, y1), (x2, y2), bbox_color, 2)
+            cv2.putText(image_show, f"{label} ID: {obj_id}", (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, bbox_color, 2)
 
+        # Draw the path of the tracked object
+        path_color = car_colour  # Default blue color for car paths
+        if obj_id in violations:
+            path_color = (0, 0, 255)  # Red for violation path
+
+        for k in range(1, len(tracked_positions[obj_id])):
+            if k == 1:
+                continue
+            cv2.line(image_show, tracked_positions[obj_id][k - 1], tracked_positions[obj_id][k], path_color, 2)
+        
     # Display the image
     cv2.imshow('Image', image_show)
 
